@@ -26,9 +26,11 @@ class RandomBot(LiacBot):
             print(state['board'])
             raw_input()
 
-        moves = board.generate()
+        #moves = board.generate()
 
-        nMoves = board.evaluate(moves)
+        nMoves = self.negamax(1, board)
+        nMoves = nMoves[0][0]
+        #nMoves = board.evaluate(moves)
         self.last_move = nMoves
         print(nMoves)
         self.send_move(nMoves[0], nMoves[1])
@@ -43,6 +45,28 @@ class RandomBot(LiacBot):
         # sys.exit()
 
 
+    def negamax(self, depth, board):
+        if depth == 0:
+            return ([],board.evaluate())
+
+        moves = board.generate()
+        if len(moves) == 0:
+            return ([],board.evaluate())
+
+        max = -sys.maxint - 1
+        myMove = []
+
+        for move in moves:
+            score = self.negamax(depth - 1, Board(None, board, move))
+            score = (score[0],-score[1])
+
+            if score[1] > max:
+                max = score[1]
+                n_move = [move]
+                n_move.append(score[0])
+                myMove = n_move
+        return (myMove,max)
+
 
 # =============================================================================
 
@@ -50,88 +74,97 @@ class RandomBot(LiacBot):
 
 class Board(object):
 
+
     # pega todos movimentos possiveis, copia o mapa do tabuleiro. Para cada movimento possivel, faz evaluation simples
     # retorna o movimento com o melhor evaluation
-    def evaluate(self, moves):
-        maxPoint = 0
-        bestMove = moves[0]
+    def evaluate(self):
 
-        for move in moves:
-            #copia completamente o estado do mapa (acho que e lento)
-            myCells = copy.deepcopy(self.cells)
-
-
-            #faz movimento no mapa copiado
-
-            #print type(myCells[move[0][0]] [move[0][1]])
-            #print type(myCells[move[1][0]] [move[1][1]])
-            myCells[move[1][0]] [move[1][1]] = myCells[move[0][0]] [move[0][1]]
-            myCells[move[0][0]] [move[0][1]] = None
-            #print type(myCells[move[0][0]] [move[0][1]])
-            #print type(myCells[move[1][0]] [move[1][1]])
-            #print "\n"
-
-
-
-            count_pieces = {
-                Rook: 0,
-                Pawn: 0,
-                Bishop: 0,
-                Queen: 0,
-                Knight: 0
-            }
-
-            #conta pecas no mapa copiado
-            for row in xrange(7, -1, -1):
-                for col in xrange(0, 8):
-                    if myCells[row][col] is not None:
-                        if myCells[row][col].team == self.state['who_moves']:
-                            count_pieces[type(myCells[row][col])] += 1
-                        else:
-                            count_pieces[type(myCells[row][col])] -= 1
-
-            #funcao de avaliacao. simples
-            points = 9 * count_pieces[Queen] + 5 * count_pieces[Rook] + 3 * count_pieces[Bishop] + 3 * count_pieces[Knight] + count_pieces[Pawn]
-
-            print (points)
-            if points > maxPoint:
-                bestMove = move
-                maxPoint = points
-
-        return bestMove
-
-
-    def __init__(self, state):
-        self.cells = [[None for j in xrange(8)] for i in xrange(8)]
-        self.my_pieces = []
-        self.state = state
-        self.moves = []
-
-        PIECES = {
-            'r': Rook,
-            'p': Pawn,
-            'b': Bishop,
-            'q': Queen,
-            'n': Knight,
+        count_pieces = {
+            Rook: 0,
+            Pawn: 0,
+            Bishop: 0,
+            Queen: 0,
+            Knight: 0
         }
 
-        my_team = state['who_moves']
-        c = state['board']
-        i = 0
-
+        #conta pecas no mapa copiado
         for row in xrange(7, -1, -1):
             for col in xrange(0, 8):
-                if c[i] != '.':
-                    cls = PIECES[c[i].lower()]
-                    team = BLACK if c[i].lower() == c[i] else WHITE
+                if self.cells[row][col] is not None:
+                    if self.cells[row][col].team == self.my_team:
+                        count_pieces[type(self.cells[row][col])] += 1
+                    else:
+                        count_pieces[type(self.cells[row][col])] -= 1
 
-                    piece = cls(self, team, (row, col))
-                    self.cells[row][col] = piece
+        #funcao de avaliacao. simples
+        points = 9 * count_pieces[Queen] + 5 * count_pieces[Rook] + 3 * count_pieces[Bishop] + 3 * count_pieces[Knight] + count_pieces[Pawn]
 
-                    if team == my_team:
-                        self.my_pieces.append(piece)
+        #print (points)
 
-                i += 1
+        return (points)
+
+
+    def __init__(self, state, board = None, move = None):
+        if board == None:
+            self.cells = [[None for j in xrange(8)] for i in xrange(8)]
+            self.my_pieces = []
+            self.state = state
+            self.moves = []
+
+            self.my_team = state['who_moves']
+
+            PIECES = {
+                'r': Rook,
+                'p': Pawn,
+                'b': Bishop,
+                'q': Queen,
+                'n': Knight,
+            }
+
+
+            c = state['board']
+            i = 0
+
+            for row in xrange(7, -1, -1):
+                for col in xrange(0, 8):
+                    if c[i] != '.':
+                        cls = PIECES[c[i].lower()]
+                        team = BLACK if c[i].lower() == c[i] else WHITE
+
+                        piece = cls(self, team, (row, col))
+                        self.cells[row][col] = piece
+
+                        if team == self.my_team:
+                            self.my_pieces.append(piece)
+
+                    i += 1
+
+        else:
+            self.cells = copy.deepcopy(board.cells)
+            self.my_pieces = []
+            self.state = None
+            self.moves = []
+            self.my_team = -board.my_team
+
+
+            #make the move in this board
+
+            self.make_move(move)
+
+            #update my cells for later use
+            for row in xrange(7, -1, -1):
+                for col in xrange(0, 8):
+                    if self.cells[row][col] is not None:
+                        if self.cells[row][col].team == self.my_team:
+                            self.my_pieces.append(self.cells[row][col])
+
+    def make_move(self, move):
+        self.moves = []
+        self.cells[move[1][0]] [move[1][1]] = self.cells[move[0][0]] [move[0][1]]
+        self.cells[move[0][0]] [move[0][1]] = None
+        #adjust position variable inside
+        self.cells[move[1][0]] [move[1][1]].position = move[1]
+
 
     def __getitem__(self, pos):
         if not 0 <= pos[0] <= 7 or not 0 <= pos[1] <= 7:
