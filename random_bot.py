@@ -31,7 +31,7 @@ class RandomBot(LiacBot):
 
         #moves = board.generate()
 
-        nMoves = self.negamax(3, board, board.my_team * MAX, board.my_team * MIN)
+        nMoves = self.negamax(4, board, MIN, MAX)
         nMoves = nMoves[0][0]
         #nMoves = board.evaluate(moves)
         self.last_move = nMoves
@@ -68,10 +68,22 @@ class RandomBot(LiacBot):
             board.my_team = -board.my_team
 
             score = self.negamax(depth - 1, board, -beta, -alpha)
-            score = (score[0],-score[1])
+            score = (score[0], -score[1])
 
             board.my_team = -board.my_team
             board.unmake_move(move, removed_piece)
+
+            if score[1] > max:
+                max = score[1]
+                n_move = [move]
+                n_move.append(score[0])
+                myMove = n_move
+
+            if max >= beta:
+                return (myMove, score[1])
+
+            alpha = max;
+
 
         #     if score[1] >= beta:
         #         n_move = [move]
@@ -86,11 +98,8 @@ class RandomBot(LiacBot):
         #
         # return (myMove,alpha)
 
-            if score[1] > max:
-                max = score[1]
-                n_move = [move]
-                n_move.append(score[0])
-                myMove = n_move
+
+
 
 
         return (myMove,max)
@@ -443,8 +452,8 @@ class Knight(Piece):
 # =============================================================================
 
 if __name__ == '__main__':
-    color = -1
-    port = 50200
+    color = 1
+    port = 50100
 
     if len(sys.argv) > 1:
         if sys.argv[1] == 'black':
