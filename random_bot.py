@@ -9,6 +9,8 @@ WHITE = 1
 BLACK = -1
 NONE = 0
 
+MAX = sys.maxint
+
 # BOT =========================================================================
 
 class RandomBot(LiacBot):
@@ -28,7 +30,7 @@ class RandomBot(LiacBot):
 
         #moves = board.generate()
 
-        nMoves = self.negamax(1, board)
+        nMoves = self.negamax(3, board, board.my_team * MAX, -board.my_team * MAX)
         nMoves = nMoves[0][0]
         #nMoves = board.evaluate(moves)
         self.last_move = nMoves
@@ -45,8 +47,10 @@ class RandomBot(LiacBot):
         # sys.exit()
 
 
-    def negamax(self, depth, board):
+    def negamax(self, depth, board, alpha, beta):
+        #print "profundidade[",depth
         if depth == 0:
+            #print board.my_team
             return ([],board.evaluate())
 
         moves = board.generate()
@@ -57,15 +61,37 @@ class RandomBot(LiacBot):
         myMove = []
 
         for move in moves:
-            score = self.negamax(depth - 1, Board(None, board, move))
+            #board.moves = []
+
+            removed_piece = board.make_move(move)
+            board.my_team = -board.my_team
+
+            score = self.negamax(depth - 1, board, -beta, -alpha)
             score = (score[0],-score[1])
+
+            board.my_team = -board.my_team
+            board.unmake_move(move, removed_piece)
 
             if score[1] > max:
                 max = score[1]
                 n_move = [move]
                 n_move.append(score[0])
                 myMove = n_move
+
+
         return (myMove,max)
+
+            # if score[1] >= beta:
+            #     n_move = [move]
+            #     n_move.append(score[0])
+            #     myMove = n_move
+            #     return (myMove,score[1])
+            # else:
+            #     alpha = score[1]
+            #     n_move = [move]
+            #     n_move.append(score[0])
+            #     myMove = n_move
+            #     return (myMove,alpha)
 
 
 # =============================================================================
@@ -74,9 +100,6 @@ class RandomBot(LiacBot):
 
 class Board(object):
 
-
-    # pega todos movimentos possiveis, copia o mapa do tabuleiro. Para cada movimento possivel, faz evaluation simples
-    # retorna o movimento com o melhor evaluation
     def evaluate(self):
 
         count_pieces = {
@@ -87,7 +110,7 @@ class Board(object):
             Knight: 0
         }
 
-        #conta pecas no mapa copiado
+        #conta pecas no mapa atual
         for row in xrange(7, -1, -1):
             for col in xrange(0, 8):
                 if self.cells[row][col] is not None:
@@ -99,71 +122,72 @@ class Board(object):
         #funcao de avaliacao. simples
         points = 9 * count_pieces[Queen] + 5 * count_pieces[Rook] + 3 * count_pieces[Bishop] + 3 * count_pieces[Knight] + count_pieces[Pawn]
 
-        #print (points)
-
-        return (points)
+        return points
 
 
-    def __init__(self, state, board = None, move = None):
-        if board == None:
-            self.cells = [[None for j in xrange(8)] for i in xrange(8)]
-            self.my_pieces = []
-            self.state = state
-            self.moves = []
+    def __init__(self, state):
+        self.cells = [[None for j in xrange(8)] for i in xrange(8)]
+        #self.my_pieces = []
+        self.state = state
+        #self.moves = []
 
-            self.my_team = state['who_moves']
+        self.my_team = state['who_moves']
 
-            PIECES = {
-                'r': Rook,
-                'p': Pawn,
-                'b': Bishop,
-                'q': Queen,
-                'n': Knight,
-            }
-
-
-            c = state['board']
-            i = 0
-
-            for row in xrange(7, -1, -1):
-                for col in xrange(0, 8):
-                    if c[i] != '.':
-                        cls = PIECES[c[i].lower()]
-                        team = BLACK if c[i].lower() == c[i] else WHITE
-
-                        piece = cls(self, team, (row, col))
-                        self.cells[row][col] = piece
-
-                        if team == self.my_team:
-                            self.my_pieces.append(piece)
-
-                    i += 1
-
-        else:
-            self.cells = copy.deepcopy(board.cells)
-            self.my_pieces = []
-            self.state = None
-            self.moves = []
-            self.my_team = -board.my_team
+        PIECES = {
+            'r': Rook,
+            'p': Pawn,
+            'b': Bishop,
+            'q': Queen,
+            'n': Knight,
+        }
 
 
-            #make the move in this board
+        c = state['board']
+        i = 0
 
-            self.make_move(move)
+        for row in xrange(7, -1, -1):
+            for col in xrange(0, 8):
+                if c[i] != '.':
+                    cls = PIECES[c[i].lower()]
+                    team = BLACK if c[i].lower() == c[i] else WHITE
 
-            #update my cells for later use
-            for row in xrange(7, -1, -1):
-                for col in xrange(0, 8):
-                    if self.cells[row][col] is not None:
-                        if self.cells[row][col].team == self.my_team:
-                            self.my_pieces.append(self.cells[row][col])
+                    piece = cls(self, team, (row, col))
+                    self.cells[row][col] = piece
+
+                    #if team == self.my_team:
+                    #    self.my_pieces.append(piece)
+
+                i += 1
+
 
     def make_move(self, move):
-        self.moves = []
+        removed_piece = None
+
+        #saves the removed piece
+        if self.cells[move[1][0]] [move[1][1]] is not None:
+            removed_piece = self.cells[move[1][0]] [move[1][1]];
+
+        #self.moves = [] doent clean up board moves
+
         self.cells[move[1][0]] [move[1][1]] = self.cells[move[0][0]] [move[0][1]]
         self.cells[move[0][0]] [move[0][1]] = None
         #adjust position variable inside
         self.cells[move[1][0]] [move[1][1]].position = move[1]
+
+        return removed_piece
+
+    def unmake_move(self, move, removed_piece):
+        #self.moves = []
+
+        self.cells[move[0][0]] [move[0][1]] = self.cells[move[1][0]] [move[1][1]]
+        self.cells[move[1][0]] [move[1][1]] = None
+        #adjust position variable inside
+        self.cells[move[0][0]] [move[0][1]].position = move[0]
+
+        #retrieves the removed piece
+        if removed_piece is not None:
+            self.cells[move[1][0]] [move[1][1]] = removed_piece
+
 
 
     def __getitem__(self, pos):
@@ -176,16 +200,24 @@ class Board(object):
         self._cells[pos[0]][pos[1]] = value
 
     def is_empty(self, pos):
-        return self[pos] is None
+        if 0 <= pos[0] <= 7:
+            return self[pos] is None
+        else:
+            return False
 
     def generate(self):
-        #moves = []
-        for piece in self.my_pieces:
-            ms = piece.generate()
-            ms = [(piece.position, m) for m in ms]
-            self.moves.extend(ms)
+        moves = []
 
-        return self.moves
+        for row in xrange(7, -1, -1):
+            for col in xrange(0, 8):
+                if self.cells[row][col] is not None:
+                    if self.cells[row][col].team == self.my_team:
+                        piece = self.cells[row][col]
+                        ms = piece.generate()
+                        ms = [(piece.position, m) for m in ms]
+                        moves.extend(ms)
+
+        return moves
 
 class Piece(object):
     myType = None
@@ -408,8 +440,8 @@ class Knight(Piece):
 # =============================================================================
 
 if __name__ == '__main__':
-    color = 0
-    port = 50200
+    color = 1
+    port = 50100
 
     if len(sys.argv) > 1:
         if sys.argv[1] == 'black':
