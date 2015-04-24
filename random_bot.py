@@ -1,3 +1,4 @@
+
 import time
 import sys
 import random
@@ -8,6 +9,8 @@ from base_client import LiacBot
 WHITE = 1
 BLACK = -1
 NONE = 0
+MEU = 0
+MAX = sys.maxint
 
 # BOT =========================================================================
 
@@ -19,22 +22,24 @@ class RandomBot(LiacBot):
         self.last_move = None
 
     def on_move(self, state):
-        print('Generating a move...'),
+        print "Generating a move...,"
         board = Board(state)
-
         if state['bad_move']:
-            print(state['board'])
-            raw_input()
+            print(state['bad_move'])
+            print "bad"
+	    print "bad"
+	    print "bad"
+	    #raw_input()
 
         #moves = board.generate()
 
-        nMoves = self.negamax(1, board)
+        nMoves = self.negamax(4, board, -MAX, MAX)
         nMoves = nMoves[0][0]
         #nMoves = board.evaluate(moves)
         self.last_move = nMoves
         print(nMoves)
         self.send_move(nMoves[0], nMoves[1])
-
+	
         #move = random.choice(moves)
         #self.last_move = move
         #print(move)
@@ -42,25 +47,74 @@ class RandomBot(LiacBot):
 
     def on_game_over(self, state):
         print('Game Over.')
-        # sys.exit()
+        sys.exit()
 
 
-    def negamax(self, depth, board):
+    def negamax(self, depth, board, alpha, beta):
+	#print "profundidade[",depth
         if depth == 0:
             return ([],board.evaluate())
 
         moves = board.generate()
         if len(moves) == 0:
             return ([],board.evaluate())
-
-        max = -sys.maxint - 1
+	#max = -sys.maxint - 1
         myMove = []
-
+        #j = 0
         for move in moves:
-            score = self.negamax(depth - 1, Board(None, board, move))
+            #j = j+1
+            #print "jogada", j
+            board.moves = []
+            #print move
+	    posO, posNova, tipoMinha, tipoInimigo, idMinha, idInimigo = board.make_move(move)
+            board.my_team = -board.my_team         
+	    board.my_pieces, board.enemy_pieces = board.enemy_pieces, board.my_pieces
+	
+	    score = self.negamax(depth - 1, board, -beta, -alpha)
             score = (score[0],-score[1])
+	    
+            board.my_team = -board.my_team
+            board.my_pieces, board.enemy_pieces = board.enemy_pieces, board.my_pieces
+	    board.unmake_move(posO, posNova, tipoMinha, tipoInimigo, idMinha, idInimigo)
+	   
+	    if score[1] >= beta:
+		n_move = [move]
+                n_move.append(score[0])
+                myMove = n_move		
+		return (myMove,score[1])          
+	    else:	
+     		alpha = score[1]
+                n_move = [move]
+                n_move.append(score[0])
+                myMove = n_move
+        return (myMove,alpha)
 
-            if score[1] > max:
+    def negamax2(self, depth, board):
+	#print "profundidade[",depth
+        if depth == 0:
+            return ([],board.evaluate())
+
+        moves = board.generate()
+        if len(moves) == 0:
+            return ([],board.evaluate())
+	max = -sys.maxint - 1
+        myMove = []
+        #j = 0
+        for move in moves:
+            #j = j+1
+            #print "jogada", j
+	    board.moves = []
+	    posO, posNova, tipoMinha, tipoInimigo, idMinha, idInimigo = board.make_move(move)
+            board.my_team = -board.my_team         
+	    board.my_pieces, board.enemy_pieces = board.enemy_pieces, board.my_pieces
+	
+	    score = self.negamax(depth - 1, board)
+            score = (score[0],-score[1])
+	    
+            board.my_team = -board.my_team
+            board.my_pieces, board.enemy_pieces = board.enemy_pieces, board.my_pieces
+	    board.unmake_move(posO, posNova, tipoMinha, tipoInimigo, idMinha, idInimigo)
+	    if score[1] > max:
                 max = score[1]
                 n_move = [move]
                 n_move.append(score[0])
@@ -72,51 +126,65 @@ class RandomBot(LiacBot):
 
 # MODELS ======================================================================
 
+
 class Board(object):
 
 
     # pega todos movimentos possiveis, copia o mapa do tabuleiro. Para cada movimento possivel, faz evaluation simples
     # retorna o movimento com o melhor evaluation
     def evaluate(self):
-
-        count_pieces = {
-            Rook: 0,
-            Pawn: 0,
-            Bishop: 0,
-            Queen: 0,
-            Knight: 0
-        }
-
-        #conta pecas no mapa copiado
-        for row in xrange(7, -1, -1):
-            for col in xrange(0, 8):
-                if self.cells[row][col] is not None:
-                    if self.cells[row][col].team == self.my_team:
-                        count_pieces[type(self.cells[row][col])] += 1
-                    else:
-                        count_pieces[type(self.cells[row][col])] -= 1
+	totalMeu = 0	
+	totalOponente = 0	
+	i = 0
+        j = 0
+	if self.my_team == BLACK:
+	    for p in self.my_pieces['p']:
+	    	totalMeu = totalMeu+7-p.position[0]
+		i = i+1
+	    for p in self.enemy_pieces['p']:
+	    	totalOponente = totalOponente+p.position[0]
+		j = j+10
+	else:	    
+	    for p in self.my_pieces['p']:
+		i = i+1
+	    	totalMeu = totalMeu+p.position[0]
+	    for p in self.enemy_pieces['p']:
+	    	totalOponente = totalOponente+7-p.position[0]	
+	    	j = j+10
+	
 
         #funcao de avaliacao. simples
-        points = 9 * count_pieces[Queen] + 5 * count_pieces[Rook] + 3 * count_pieces[Bishop] + 3 * count_pieces[Knight] + count_pieces[Pawn]
+        points = 9 * (len(self.my_pieces['q'])-len(self.enemy_pieces['q'])) + 3 * (len(self.my_pieces['n'])-len(self.enemy_pieces['n'])) + 5 * (len(self.my_pieces['r'])-len(self.enemy_pieces['r'])) + (len(self.my_pieces['p'])-len(self.enemy_pieces['p']))
 
         #print (points)
-
+	#print self.my_team
         return (points)
 
 
     def __init__(self, state, board = None, move = None):
         if board == None:
             self.cells = [[None for j in xrange(8)] for i in xrange(8)]
-            self.my_pieces = []
+            self.my_pieces = {
+                'r': [],
+                'p': [],
+                'q': [],
+                'n': [],
+            }
+
+            self.enemy_pieces = {
+                'r': [],
+                'p': [],
+                'q': [],
+                'n': [],
+            }
             self.state = state
             self.moves = []
 
             self.my_team = state['who_moves']
-
+	    MEU = state['who_moves']
             PIECES = {
                 'r': Rook,
                 'p': Pawn,
-                'b': Bishop,
                 'q': Queen,
                 'n': Knight,
             }
@@ -124,47 +192,182 @@ class Board(object):
 
             c = state['board']
             i = 0
-
+	    #print "INICIAL"
             for row in xrange(7, -1, -1):
                 for col in xrange(0, 8):
                     if c[i] != '.':
-                        cls = PIECES[c[i].lower()]
-                        team = BLACK if c[i].lower() == c[i] else WHITE
-
-                        piece = cls(self, team, (row, col))
-                        self.cells[row][col] = piece
+			identificacao = c[i].lower()
+                        cls = PIECES[identificacao]
+                        team = BLACK if identificacao == c[i] else WHITE
+			
+                        piece = cls(self, team, (row, col), row*8+col)
+			self.cells[row][col] = piece
 
                         if team == self.my_team:
-                            self.my_pieces.append(piece)
+                            self.my_pieces[identificacao].append(piece)
+			else:
+			    self.enemy_pieces[identificacao].append(piece)
+            
 
                     i += 1
 
-        else:
-            self.cells = copy.deepcopy(board.cells)
-            self.my_pieces = []
-            self.state = None
-            self.moves = []
-            self.my_team = -board.my_team
-
-
-            #make the move in this board
-
-            self.make_move(move)
-
-            #update my cells for later use
-            for row in xrange(7, -1, -1):
-                for col in xrange(0, 8):
-                    if self.cells[row][col] is not None:
-                        if self.cells[row][col].team == self.my_team:
-                            self.my_pieces.append(self.cells[row][col])
-
     def make_move(self, move):
-        self.moves = []
-        self.cells[move[1][0]] [move[1][1]] = self.cells[move[0][0]] [move[0][1]]
-        self.cells[move[0][0]] [move[0][1]] = None
-        #adjust position variable inside
-        self.cells[move[1][0]] [move[1][1]].position = move[1]
+	#print "MAKE"
+	p = self.cells[move[1][0]][move[1][1]]	
+	myPiece = self.cells[move[0][0]] [move[0][1]]
+	idMinha = myPiece.pk
 
+	clsE= None
+	idInimigo = None
+	#print self.cells[7][0]
+	#print self.cells[7][6]
+	#print "POSICAO 00 self.cells[7][6]"
+	pName =  type(p).__name__
+
+	if(p is not None):
+	    #print "minha pegou",type(myPiece), myPiece.position
+	    #print pName	    
+	    if(pName == "Pawn"):
+		#print "removed ",pName," from ",p.position		
+		clsE = Pawn
+	        self.enemy_pieces['p'].remove(p)
+	    elif(pName == "Rook"):
+		#print "removed ",pName," from ",p.position
+		self.enemy_pieces['r'].remove(p)
+		clsE = Rook
+	    elif(pName == "Queen"):	    
+		#print "removed ",pName," from ",p.position
+		self.enemy_pieces['q'].remove(p)
+	    	clsE = Queen
+            elif(pName == "Knight"):
+		#print "removed ",pName," from ",p.position
+		self.enemy_pieces['n'].remove(p)
+		clsE = Knight
+	    idInimigo = p.pk
+	
+	try:
+	    #index = self.my_pieces['p'].index(myPiece)
+    	    #pc = self.my_pieces['p'].pop(index)
+	    #print "REMOVIDA ",pc.position,"-", pc.pk," ",type(pc)
+	    #print "REMOVIDA ",myPiece.position,"-", myPiece.pk," ",type(myPiece)
+	    self.my_pieces['p'].remove(myPiece)
+	    #print "remove MYPIECE",type(myPiece).__name__,"FROM p ",myPiece.position
+	    myPiece.position = move[1]
+	    self.my_pieces['p'].append(myPiece)
+	    #print "===and added to ", myPiece.position
+	    clsM = Pawn
+	except ValueError:		
+    	    try:
+    	        #index = self.my_pieces['q'].index(myPiece)
+    	        #pc = self.my_pieces['q'].pop(index)
+	        #print "REMOVIDA ",pc.position,"-", pc.pk," ",type(pc)
+	        #print "REMOVIDA ",myPiece.position,"-", myPiece.pk," ",type(myPiece)
+	        self.my_pieces['q'].remove(myPiece)
+	    	#print "remove MYPIECE",type(myPiece).__name__,"FROM q ",myPiece.position
+		myPiece.position = move[1]
+		self.my_pieces['q'].append(myPiece)
+		#print "===and added to ", myPiece.position
+	        clsM = Queen
+	    except ValueError:
+    	        try:
+    	            #index = self.my_pieces['n'].index(myPiece)
+    	    	    #pc = self.my_pieces['n'].pop(index)
+	    	    #print "REMOVIDA ",pc.position,"-", pc.pk," ",type(pc)
+	    	    #print "REMOVIDA ",myPiece.position,"-", myPiece.pk," ",type(myPiece)
+	            self.my_pieces['n'].remove(myPiece)
+	            #print "remove MYPIECE",type(myPiece).__name__,"FROM n ",myPiece.position	
+		    myPiece.position = move[1]
+		    self.my_pieces['n'].append(myPiece)
+		    #print "===and added to ", myPiece.position
+		    clsM = Knight
+		except ValueError:
+    	       	    try:
+    	                #index = self.my_pieces['r'].index(myPiece)
+    	    		#pc = self.my_pieces['r'].pop(index)
+	    		#print "REMOVIDA ",pc.position,"-", pc.pk," ",type(pc)
+	    		#print "REMOVIDA ",myPiece.position,"-", myPiece.pk," ",type(myPiece)
+	    		self.my_pieces['r'].remove(myPiece)
+	    		#print "remove MYPIECE",type(myPiece).__name__,"FROM r ",myPiece.position
+			myPiece.position = move[1]
+			self.my_pieces['r'].append(myPiece)
+			#print "===and added to ", myPiece.position
+			clsM = Rook
+		    except ValueError:
+			print "ERRORERRORERRORERRORERRORERRORERRORERRORERRORERRORERRORERRORERRORERRORERRORERRORERROR"	
+	
+	self.cells[move[1][0]] [move[1][1]] = myPiece
+	self.cells[move[0][0]] [move[0][1]] = None
+	
+	#adjust position variable inside
+        self.cells[move[1][0]] [move[1][1]].position = move[1]
+	
+	#if not type(p).__name__==pName:
+	#    print "MEGAERRRO"
+	#    print type(p).__name__,"!=",pName
+	#    print type(myPiece).__name__
+	#    return
+	#print clsM
+	return move[0], move[1], clsM, clsE, idMinha, idInimigo
+
+    def unmake_move(self, posO, posNova, clsM, clsE, idMinha, idInimigo):
+	#print "UNMAKE"
+	minha = clsM(self, self.my_team, posO, idMinha)	
+	mineX = posNova[0]
+	mineY = posNova[1]
+	#print clsM
+	try:
+    	    self.my_pieces['p'].remove(minha)
+	    #print "devolveu ",type(minha).__name__," da posicao ",self.cells[mineX][mineY].position
+	    self.cells[posO[0]][posO[1]] = minha
+	    #print "===para a posicao ",minha.position
+	    self.my_pieces['p'].append(minha)		
+        except ValueError:
+    	    try:
+    	        self.my_pieces['q'].remove(minha)
+	    	#print "devolveu ",type(minha).__name__," da posicao ",self.cells[mineX][mineY].position
+	    	self.cells[posO[0]][posO[1]] = minha
+	        #print "===para a posicao ",minha.position
+		self.my_pieces['q'].append(minha)
+	    except ValueError:
+    	        try:
+    	            self.my_pieces['n'].remove(minha)
+	    	    #print "devolveu ",type(minha).__name__," da posicao ",self.cells[mineX][mineY].position
+	    	    self.cells[posO[0]][posO[1]] = minha
+	            #print "===para a posicao ",minha.position
+		    self.my_pieces['n'].append(minha)
+		except ValueError:
+    	       	    try:
+    	                self.my_pieces['r'].remove(minha)
+	    		#print "devolveu ",type(minha).__name__," da posicao ",self.cells[mineX][mineY].position
+	    		self.cells[posO[0]][posO[1]] = minha
+	                #print "===para a posicao ",minha.position
+			self.my_pieces['r'].append(minha)
+		    except ValueError:
+			print "ERRORERRORERRORERRORERRORERROR"		
+	    
+	self.cells[posO[0]][posO[1]].position = posO            
+	self.cells[mineX][mineY] = None
+	
+	if(idInimigo is not None):
+	    inimigo = clsE(self, -self.my_team, posNova, idInimigo)
+	    self.cells[mineX][mineY] = inimigo
+	    self.cells[mineX][mineY].position = inimigo.position
+	    
+
+	    enemyName =  type(inimigo).__name__
+	    
+	    if(enemyName == "Pawn"):
+	        self.enemy_pieces['p'].append(inimigo)
+		#print "DEVOLVEU INIMIGO PARA ",inimigo.position  
+	    elif(enemyName == "Rook"):
+	        self.enemy_pieces['r'].append(inimigo)
+		#print "DEVOLVEU INIMIGO PARA ",inimigo.position
+	    elif(enemyName == "Queen"):	    
+		self.enemy_pieces['q'].append(inimigo)
+		#print "DEVOLVEU INIMIGO PARA ",inimigo.position
+	    elif(enemyName == "Knight"):
+		self.enemy_pieces['n'].append(inimigo)
+		#print "DEVOLVEU INIMIGO PARA ",inimigo.position
 
     def __getitem__(self, pos):
         if not 0 <= pos[0] <= 7 or not 0 <= pos[1] <= 7:
@@ -179,11 +382,24 @@ class Board(object):
         return self[pos] is None
 
     def generate(self):
-        #moves = []
-        for piece in self.my_pieces:
+        moves = []
+        for piece in self.my_pieces['r']:
             ms = piece.generate()
             ms = [(piece.position, m) for m in ms]
             self.moves.extend(ms)
+	for piece in self.my_pieces['n']:
+            ms = piece.generate()
+            ms = [(piece.position, m) for m in ms]
+            self.moves.extend(ms)
+        for piece in self.my_pieces['q']:
+            ms = piece.generate()
+            ms = [(piece.position, m) for m in ms]
+            self.moves.extend(ms)
+	for piece in self.my_pieces['p']:
+            ms = piece.generate()
+            ms = [(piece.position, m) for m in ms]
+            self.moves.extend(ms)
+
 
         return self.moves
 
@@ -193,7 +409,18 @@ class Piece(object):
         self.board = None
         self.team = None
         self.position = None
+	self.pk = None
         #self.type = None
+
+    def __eq__(self, other):
+	if other is None:
+	    return False        
+	
+        if self.pk == other.pk:
+            return True
+        else:
+            return False
+
 
     def generate(self):
         pass
@@ -202,10 +429,11 @@ class Piece(object):
         return piece is not None and piece.team != self.team
 
 class Pawn(Piece):
-    def __init__(self, board, team, position):
+    def __init__(self, board, team, position,pk):
         self.board = board
         self.team = team
         self.position = position
+	self.pk = pk
 
     def generate(self):
         moves = []
@@ -215,8 +443,9 @@ class Pawn(Piece):
 
         # Movement to 1 forward
         pos = (my_row + d*1, my_col)
-        if self.board.is_empty(pos):
-            moves.append(pos)
+	if 0<=pos[0]<=7:
+	    if self.board.is_empty(pos):
+	        moves.append(pos)
 
         # Normal capture to right
         pos = (my_row + d*1, my_col+1)
@@ -233,10 +462,11 @@ class Pawn(Piece):
         return moves
 
 class Rook(Piece):
-    def __init__(self, board, team, position):
+    def __init__(self, board, team, position,pk):
         self.board = board
         self.team = team
         self.position = position
+	self.pk = pk
         
     def _col(self, dir_):
         my_row, my_col = self.position
@@ -276,10 +506,11 @@ class Rook(Piece):
         return moves
 
 class Bishop(Piece):
-    def __init__(self, board, team, position):
+    def __init__(self, board, team, position, pk):
         self.board = board
         self.team = team
         self.position = position
+	self.pk = pk
 
     def _gen(self, moves, row_dir, col_dir):
         my_row, my_col = self.position
@@ -311,10 +542,11 @@ class Bishop(Piece):
         return moves
 
 class Queen(Piece):
-    def __init__(self, board, team, position):
+    def __init__(self, board, team, position,pk):
         self.board = board
         self.team = team
         self.position = position
+	self.pk = pk
 
     def _col(self, dir_):
         my_row, my_col = self.position
@@ -378,10 +610,11 @@ class Queen(Piece):
         return moves
 
 class Knight(Piece):
-    def __init__(self, board, team, position):
+    def __init__(self, board, team, position,pk):
         self.board = board
         self.team = team
         self.position = position
+	self.pk = pk
 
     def _gen(self, moves, row, col):
         if not 0 <= row <= 7 or not 0 <= col <= 7:
@@ -414,15 +647,12 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         if sys.argv[1] == 'black':
             color = 1
-            port = 50200
+            port = 50100
 
     bot = RandomBot()
     bot.port = port
 
     bot.start()
-
-
-
 
 
 
