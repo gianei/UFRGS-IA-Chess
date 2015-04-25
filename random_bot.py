@@ -2,6 +2,7 @@ import time
 import sys
 import random
 import copy
+import timeit
 
 from base_client import LiacBot
 
@@ -12,16 +13,26 @@ NONE = 0
 MAX = sys.maxint
 MIN = -sys.maxint - 1
 
+
 # BOT =========================================================================
+
+
 
 class RandomBot(LiacBot):
     name = 'Random Bot'
+
+    def is_enough_time(self):
+        if timeit.default_timer() - self.timer > 5:
+            return  False
+        return True
 
     def __init__(self):
         super(RandomBot, self).__init__()
         self.last_move = None
 
     def on_move(self, state):
+        self.timer = timeit.default_timer()
+
         print('Generating a move...'),
         board = Board(state)
 
@@ -31,7 +42,7 @@ class RandomBot(LiacBot):
 
         #moves = board.generate()
 
-        nMoves = self.negamax(4, board, MIN, MAX)
+        nMoves = self.negamax(3, board, MIN, MAX)
         nMoves = nMoves[0][0]
         #nMoves = board.evaluate(moves)
         self.last_move = nMoves
@@ -48,9 +59,11 @@ class RandomBot(LiacBot):
         # sys.exit()
 
 
+
+
     def negamax(self, depth, board, alpha, beta):
         #print "profundidade[",depth
-        if depth == 0:
+        if depth == 0 or not self.is_enough_time():
             #print board.my_team
             return ([],board.evaluate())
 
@@ -122,17 +135,73 @@ class Board(object):
             Knight: 0
         }
 
+        my_pawns = 0
+        enemy_pawns = 0
+
+
+        forward_points = 0
+
+
         #conta pecas no mapa atual
         for row in xrange(7, -1, -1):
             for col in xrange(0, 8):
                 if self.cells[row][col] is not None:
-                    if self.cells[row][col].team == self.my_team:
-                        count_pieces[type(self.cells[row][col])] += 1
+                    piece = self.cells[row][col];
+                    if piece.team == self.my_team:
+                        count_pieces[type(piece)] += 1
+                        my_pawns +=1
                     else:
-                        count_pieces[type(self.cells[row][col])] -= 1
+                        count_pieces[type(piece)] -= 1
+                        enemy_pawns +=1
+
+                    #gives points for forwarding Pawns and huge points when last move
+                    if type(piece) == Pawn:
+                        position = 0.0
+                        if piece.team == BLACK:
+                            position = pow((6 -row), 1.1)
+                            #if in final row
+                            if row == 0:
+                                if piece.team == self.my_team:
+                                    forward_points +=400
+                                else:
+                                    forward_points -=400
+                        else:
+                            position = pow((row - 1), 1.1)
+                            #if in final row
+                            if row == 7:
+                                if piece.team == self.my_team:
+                                    forward_points +=400
+                                else:
+                                    forward_points -=400
+
+
+                        if piece.team == self.my_team:
+                            my_pawns +=1
+                        else:
+                            enemy_pawns +=1
+
+                        #middle = (4 - abs(col - 4)) * 0.1
+                        #forward_points += middle
+
+
+                        if piece.team == self.my_team:
+                            forward_points += position
+                        else:
+                            forward_points -= position
+
+        if my_pawns == 0:
+            forward_points -= 400
+        if enemy_pawns == 0:
+            forward_points += 400
+        # points if last
+
+
 
         #funcao de avaliacao. simples
         points = 9 * count_pieces[Queen] + 5 * count_pieces[Rook] + 3 * count_pieces[Bishop] + 3 * count_pieces[Knight] + count_pieces[Pawn]
+
+        points += forward_points
+
 
         return points
 
@@ -452,8 +521,8 @@ class Knight(Piece):
 # =============================================================================
 
 if __name__ == '__main__':
-    color = 1
-    port = 50100
+    color = -1
+    port = 50200
 
     if len(sys.argv) > 1:
         if sys.argv[1] == 'black':
