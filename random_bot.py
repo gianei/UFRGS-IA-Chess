@@ -95,7 +95,8 @@ class RandomBot(LiacBot):
             if max >= beta:
                 return (myMove, score[1])
 
-            alpha = max;
+            if max > alpha:
+                alpha = max;
 
 
         #     if score[1] >= beta:
@@ -521,12 +522,12 @@ class Knight(Piece):
 # =============================================================================
 
 if __name__ == '__main__':
-    color = -1
-    port = 50200
+    color = WHITE
+    port = 50100
 
     if len(sys.argv) > 1:
         if sys.argv[1] == 'black':
-            color = 1
+            color = BLACK
             port = 50200
 
     bot = RandomBot()
