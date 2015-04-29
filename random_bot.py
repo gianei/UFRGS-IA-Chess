@@ -19,7 +19,7 @@ MIN = -sys.maxint - 1
 
 
 class RandomBot(LiacBot):
-    name = 'Random Bot'
+    name = 'Fu** GVT'
 
     def is_enough_time(self):
         if timeit.default_timer() - self.timer > 5:
