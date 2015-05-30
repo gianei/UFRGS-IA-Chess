@@ -13,13 +13,15 @@ NONE = 0
 MAX = sys.maxint
 MIN = -sys.maxint - 1
 
+MINMAX_LEVELS = 4
+
 
 # BOT =========================================================================
 
 
 
 class RandomBot(LiacBot):
-    name = 'Fu** GVT'
+    name = 'PPK Bot'
 
     def is_enough_time(self):
         if timeit.default_timer() - self.timer > 5:
@@ -33,8 +35,9 @@ class RandomBot(LiacBot):
     def on_move(self, state):
         self.timer = timeit.default_timer()
 
-        print('Generating a move...'),
+        print('Generating a move...')
         board = Board(state)
+        # print('My team: ' + ('WHITE' if board.my_team == WHITE else 'BLACK'))
 
         if state['bad_move']:
             print(state['board'])
@@ -42,7 +45,8 @@ class RandomBot(LiacBot):
 
         #moves = board.generate()
 
-        nMoves = self.negamax(3, board, MIN, MAX)
+        nMoves = self.negamax(MINMAX_LEVELS, board, MIN, MAX)
+        print ('pontos final: ', nMoves[1])
         nMoves = nMoves[0][0]
         #nMoves = board.evaluate(moves)
         self.last_move = nMoves
@@ -63,13 +67,13 @@ class RandomBot(LiacBot):
 
     def negamax(self, depth, board, alpha, beta):
         #print "profundidade[",depth
-        if depth == 0 or not self.is_enough_time():
+        if depth == 0 or not self.is_enough_time() or board.is_end_condition():
             #print board.my_team
-            return ([],board.evaluate())
+            return ([],board.evaluate(depth))
 
         moves = board.generate()
         if len(moves) == 0:
-            return ([],board.evaluate())
+            return ([],board.evaluate(depth))
 
         max = -sys.maxint - 1
         myMove = []
@@ -98,24 +102,6 @@ class RandomBot(LiacBot):
             if max > alpha:
                 alpha = max;
 
-
-        #     if score[1] >= beta:
-        #         n_move = [move]
-        #         n_move.append(score[0])
-        #         myMove = n_move
-        #         return (myMove, score[1])
-        #     else:
-        #         alpha = score[1]
-        #         n_move = [move]
-        #         n_move.append(score[0])
-        #         myMove = n_move
-        #
-        # return (myMove,alpha)
-
-
-
-
-
         return (myMove,max)
 
 
@@ -126,7 +112,42 @@ class RandomBot(LiacBot):
 
 class Board(object):
 
-    def evaluate(self):
+    def is_end_condition(self):
+        my_pawns = 0
+        enemy_pawns = 0
+
+        #conta pecas no mapa atual
+        for row in xrange(7, -1, -1):
+            for col in xrange(0, 8):
+                if self.cells[row][col] is not None:
+                    piece = self.cells[row][col];
+                    #gives points for forwarding Pawns and huge points when last move
+                    if type(piece) == Pawn:
+                        position = 0.0
+                        if piece.team == BLACK:
+                            position = pow((6 -row), 1.1)
+                            #if in final row
+                            if row == 0:
+                                return True
+                        else:
+                            position = pow((row - 1), 1.1)
+                            #if in final row
+                            if row == 7:
+                                return True
+
+                        if piece.team == self.my_team:
+                            my_pawns +=1
+                        else:
+                            enemy_pawns +=1
+
+        if my_pawns == 0:
+            return True
+        if enemy_pawns == 0:
+            return True
+
+        return False
+
+    def evaluate(self, level):
 
         count_pieces = {
             Rook: 0,
@@ -141,6 +162,7 @@ class Board(object):
 
 
         forward_points = 0
+        is_end_game = False
 
 
         #conta pecas no mapa atual
@@ -150,10 +172,10 @@ class Board(object):
                     piece = self.cells[row][col];
                     if piece.team == self.my_team:
                         count_pieces[type(piece)] += 1
-                        my_pawns +=1
+                        #my_pawns +=1
                     else:
                         count_pieces[type(piece)] -= 1
-                        enemy_pawns +=1
+                        #enemy_pawns +=1
 
                     #gives points for forwarding Pawns and huge points when last move
                     if type(piece) == Pawn:
@@ -161,38 +183,36 @@ class Board(object):
                         if piece.team == BLACK:
                             position = pow((6 -row), 1.1)
                             #if in final row
+
                             if row == 0:
+                                is_end_game = True
                                 if piece.team == self.my_team:
                                     forward_points +=400
+                                    print('My team: ' + ('WHITE' if self.my_team == WHITE else 'BLACK'))
                                 else:
                                     forward_points -=400
                         else:
                             position = pow((row - 1), 1.1)
                             #if in final row
                             if row == 7:
+                                is_end_game = True
                                 if piece.team == self.my_team:
                                     forward_points +=400
                                 else:
                                     forward_points -=400
 
-
                         if piece.team == self.my_team:
                             my_pawns +=1
-                        else:
-                            enemy_pawns +=1
-
-                        #middle = (4 - abs(col - 4)) * 0.1
-                        #forward_points += middle
-
-
-                        if piece.team == self.my_team:
                             forward_points += position
                         else:
                             forward_points -= position
+                            enemy_pawns +=1
 
         if my_pawns == 0:
+            is_end_game = True
             forward_points -= 400
         if enemy_pawns == 0:
+            is_end_game = True
             forward_points += 400
         # points if last
 
@@ -201,7 +221,12 @@ class Board(object):
         #funcao de avaliacao. simples
         points = 9 * count_pieces[Queen] + 5 * count_pieces[Rook] + 3 * count_pieces[Bishop] + 3 * count_pieces[Knight] + count_pieces[Pawn]
 
+        if (level == MINMAX_LEVELS - 1 and is_end_game):
+            # print("acaba porra")
+            forward_points *= 10
+            # print (forward_points)
         points += forward_points
+
 
 
         return points
