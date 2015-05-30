@@ -1,8 +1,6 @@
-import time
 import sys
-import random
-import copy
 import timeit
+from socket import error as socket_error
 
 from base_client import LiacBot
 
@@ -23,52 +21,45 @@ MINMAX_LEVELS = 4
 class RandomBot(LiacBot):
     name = 'PPK Bot'
 
+    def __init__(self):
+        super(RandomBot, self).__init__()
+        self.last_move = None
+
     def is_enough_time(self):
         if timeit.default_timer() - self.timer > 5:
             return  False
         return True
-
-    def __init__(self):
-        super(RandomBot, self).__init__()
-        self.last_move = None
 
     def on_move(self, state):
         self.timer = timeit.default_timer()
 
         print('Generating a move...')
         board = Board(state)
-        # print('My team: ' + ('WHITE' if board.my_team == WHITE else 'BLACK'))
 
         if state['bad_move']:
             print(state['board'])
             raw_input()
 
-        #moves = board.generate()
 
-        nMoves = self.negamax(MINMAX_LEVELS, board, MIN, MAX)
-        print ('pontos final: ', nMoves[1])
+        nMoves = self.negamax(MINMAX_LEVELS, board)
         nMoves = nMoves[0][0]
-        #nMoves = board.evaluate(moves)
         self.last_move = nMoves
         print(nMoves)
         self.send_move(nMoves[0], nMoves[1])
 
-        #move = random.choice(moves)
-        #self.last_move = move
-        #print(move)
-        #self.send_move(move[0], move[1])
-
     def on_game_over(self, state):
         print('Game Over.')
-        # sys.exit()
 
+    def negamax(self, depth, board, alpha = MIN, beta = MAX):
+        '''
+        Algoritmo negamax com poda alpha beta. O algoritmo pode nao executar todos
+        os niveis quando: nao ha tempo restante, quando encontrou uma condicao de fim de jogo.
+        :param depth: quantidade de niveis da arvore
+        :param board: estado atual do tabuleiro
+        :return: tupla de movimentos e score encontrado
+        '''
 
-
-
-    def negamax(self, depth, board, alpha, beta):
-        #print "profundidade[",depth
         if depth == 0 or not self.is_enough_time() or board.is_end_condition():
-            #print board.my_team
             return ([],board.evaluate(depth))
 
         moves = board.generate()
@@ -79,8 +70,6 @@ class RandomBot(LiacBot):
         myMove = []
 
         for move in moves:
-            #board.moves = []
-
             removed_piece = board.make_move(move)
             board.my_team = -board.my_team
 
@@ -104,8 +93,6 @@ class RandomBot(LiacBot):
 
         return (myMove,max)
 
-
-
 # =============================================================================
 
 # MODELS ======================================================================
@@ -113,6 +100,9 @@ class RandomBot(LiacBot):
 class Board(object):
 
     def is_end_condition(self):
+        '''
+        testa se board atual e fim de jogo
+        '''
         my_pawns = 0
         enemy_pawns = 0
 
@@ -121,16 +111,13 @@ class Board(object):
             for col in xrange(0, 8):
                 if self.cells[row][col] is not None:
                     piece = self.cells[row][col];
-                    #gives points for forwarding Pawns and huge points when last move
                     if type(piece) == Pawn:
-                        position = 0.0
+
                         if piece.team == BLACK:
-                            position = pow((6 -row), 1.1)
                             #if in final row
                             if row == 0:
                                 return True
                         else:
-                            position = pow((row - 1), 1.1)
                             #if in final row
                             if row == 7:
                                 return True
@@ -147,7 +134,11 @@ class Board(object):
 
         return False
 
-    def evaluate(self, level):
+    def evaluate(self, depth):
+        '''
+        avalia a pontuacao atual do tabuleiro, de acordo com o jogador da vez
+        :param depth: a profundidade restante
+        '''
 
         count_pieces = {
             Rook: 0,
@@ -157,13 +148,13 @@ class Board(object):
             Knight: 0
         }
 
+        total_points = 0
+
         my_pawns = 0
         enemy_pawns = 0
 
-
-        forward_points = 0
+        end_game_points = 0
         is_end_game = False
-
 
         #conta pecas no mapa atual
         for row in xrange(7, -1, -1):
@@ -172,64 +163,57 @@ class Board(object):
                     piece = self.cells[row][col];
                     if piece.team == self.my_team:
                         count_pieces[type(piece)] += 1
-                        #my_pawns +=1
                     else:
                         count_pieces[type(piece)] -= 1
-                        #enemy_pawns +=1
 
-                    #gives points for forwarding Pawns and huge points when last move
+                    #da pontos por avancar peoes e muitos pontos quando jogada de fim
                     if type(piece) == Pawn:
-                        position = 0.0
+                        position_points = 0.0
                         if piece.team == BLACK:
-                            position = pow((6 -row), 1.1)
-                            #if in final row
+                            position_points = pow((6 -row), 1.1)
 
+                            #if in final row
                             if row == 0:
                                 is_end_game = True
                                 if piece.team == self.my_team:
-                                    forward_points +=400
-                                    print('My team: ' + ('WHITE' if self.my_team == WHITE else 'BLACK'))
+                                    end_game_points +=400
                                 else:
-                                    forward_points -=400
+                                    end_game_points -=400
                         else:
-                            position = pow((row - 1), 1.1)
+                            position_points = pow((row - 1), 1.1)
+
                             #if in final row
                             if row == 7:
                                 is_end_game = True
                                 if piece.team == self.my_team:
-                                    forward_points +=400
+                                    end_game_points +=400
                                 else:
-                                    forward_points -=400
+                                    end_game_points -=400
 
                         if piece.team == self.my_team:
                             my_pawns +=1
-                            forward_points += position
+                            total_points += position_points
                         else:
-                            forward_points -= position
+                            total_points -= position_points
                             enemy_pawns +=1
 
         if my_pawns == 0:
             is_end_game = True
-            forward_points -= 400
+            end_game_points -= 400
         if enemy_pawns == 0:
             is_end_game = True
-            forward_points += 400
-        # points if last
+            end_game_points += 400
 
+        # da mais pontos para jogadas que encerram que estao com menos profundidade
+        if (depth is not 0 and is_end_game):
+             end_game_points *= depth
 
+        #atribuicao de pesos por tipo de peca
+        total_points += 9 * count_pieces[Queen] + 5 * count_pieces[Rook] + 3 * count_pieces[Bishop] + 3 * count_pieces[Knight] + count_pieces[Pawn]
 
-        #funcao de avaliacao. simples
-        points = 9 * count_pieces[Queen] + 5 * count_pieces[Rook] + 3 * count_pieces[Bishop] + 3 * count_pieces[Knight] + count_pieces[Pawn]
+        total_points += end_game_points
 
-        if (level == MINMAX_LEVELS - 1 and is_end_game):
-            # print("acaba porra")
-            forward_points *= 10
-            # print (forward_points)
-        points += forward_points
-
-
-
-        return points
+        return total_points
 
 
     def __init__(self, state):
@@ -547,18 +531,16 @@ class Knight(Piece):
 # =============================================================================
 
 if __name__ == '__main__':
-    color = WHITE
-    port = 50100
+    try:
+        bot = RandomBot()
+        bot.port = 50100
+        bot.start()
 
-    if len(sys.argv) > 1:
-        if sys.argv[1] == 'black':
-            color = BLACK
-            port = 50200
+    except socket_error as e:
+        bot = RandomBot()
+        bot.port = 50200
+        bot.start()
 
-    bot = RandomBot()
-    bot.port = port
-
-    bot.start()
 
 
 
