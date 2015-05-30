@@ -13,16 +13,14 @@ MIN = -sys.maxint - 1
 
 MINMAX_LEVELS = 4
 
-
-# BOT =========================================================================
-
-
-
-class RandomBot(LiacBot):
+class PPKBot(LiacBot):
+    '''
+    PPK = Powerfull Pawn Killer
+    '''
     name = 'PPK Bot'
 
     def __init__(self):
-        super(RandomBot, self).__init__()
+        super(PPKBot, self).__init__()
         self.last_move = None
 
     def is_enough_time(self):
@@ -532,18 +530,11 @@ class Knight(Piece):
 
 if __name__ == '__main__':
     try:
-        bot = RandomBot()
+        bot = PPKBot()
         bot.port = 50100
         bot.start()
 
     except socket_error as e:
-        bot = RandomBot()
+        bot = PPKBot()
         bot.port = 50200
         bot.start()
-
-
-
-
-
-
-
