@@ -529,12 +529,13 @@ class Knight(Piece):
 # =============================================================================
 
 if __name__ == '__main__':
-    try:
-        bot = PPKBot()
-        bot.port = 50100
-        bot.start()
+    port = 50100
 
-    except socket_error as e:
-        bot = PPKBot()
-        bot.port = 50200
-        bot.start()
+    if len(sys.argv) > 1:
+        if sys.argv[1] == 'black':
+            port = 50200
+
+    bot = PPKBot()
+    bot.port = port
+    bot.start()
+    
